@@ -23,3 +23,12 @@ test("browser entrypoint is self-contained and does not depend on module imports
   assert.doesNotMatch(app, /^import\s/m);
   assert.match(app, /function render\(\)/);
 });
+
+test("browser entrypoint uses an inline project form instead of prompt dialogs", async () => {
+  const app = await readFile(new URL("../src/app.js", import.meta.url), "utf8");
+
+  assert.doesNotMatch(app, /window\.prompt/);
+  assert.match(app, /id="newProjectForm"/);
+  assert.match(app, /id="newProjectName"/);
+  assert.match(app, /id="confirmNewProject"/);
+});

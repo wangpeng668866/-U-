@@ -197,6 +197,7 @@ button {
   top: 0;
   z-index: 2;
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
@@ -215,6 +216,30 @@ button {
   display: flex;
   align-items: center;
   gap: 0.65rem;
+}
+
+.project-picker {
+  flex: 1 1 28rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.mode-group {
+  flex: 0 1 auto;
+  margin-left: auto;
+}
+
+.new-project-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+
+.new-project-inline input {
+  flex: 1 1 10rem;
+  min-width: 8rem;
 }
 
 .project-picker span {
@@ -258,6 +283,29 @@ select {
   border-color: var(--accent);
   color: #ffe3a5;
   background: var(--accent-soft);
+}
+
+.sync-status {
+  min-height: 2.1rem;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(95, 168, 117, 0.38);
+  border-radius: 999px;
+  padding: 0 0.75rem;
+  color: #b8e4c4;
+  background: rgba(95, 168, 117, 0.12);
+  white-space: nowrap;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .primary-button {
@@ -550,6 +598,7 @@ select {
 
   .topbar,
   .project-picker,
+  .new-project-inline,
   .mode-group {
     align-items: stretch;
     flex-direction: column;

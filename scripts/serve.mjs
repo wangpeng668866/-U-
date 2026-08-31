@@ -24,7 +24,10 @@ const server = createServer((request, response) => {
     return;
   }
 
-  response.writeHead(200, { "content-type": mimeTypes[extname(filePath)] || "application/octet-stream" });
+  response.writeHead(200, {
+    "cache-control": "no-store",
+    "content-type": mimeTypes[extname(filePath)] || "application/octet-stream"
+  });
   createReadStream(filePath).pipe(response);
 });
 

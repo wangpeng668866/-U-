@@ -37,6 +37,7 @@ test("browser entrypoint includes provider connection controls", async () => {
   const app = await readFile(new URL("../src/app.js", import.meta.url), "utf8");
 
   assert.match(app, /function testProviderConnection/);
+  assert.match(app, /function testProviderThroughProxy/);
   assert.match(app, /id="testAllProviders"/);
   assert.match(app, /data-test-provider/);
 });

@@ -264,6 +264,49 @@ function testProviderConnection(profile, settings = state.settings) {
   return { capabilityId: profile.id, mode: profile.mode, status: "ready", checkedAt, message: "配置校验通过，等待后端代理执行真实请求。" };
 }
 
+async function testProviderThroughProxy(profile) {
+  if (!canUseLocalProviderApi()) {
+    return testProviderConnection(profile);
+  }
+
+  try {
+    const response = await fetch("/api/provider/test", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        settings: state.settings,
+        capabilityId: profile.id
+      })
+    });
+    const data = await response.json();
+    return data.results?.[profile.id] || testProviderConnection(profile);
+  } catch {
+    return testProviderConnection(profile);
+  }
+}
+
+async function testAllProvidersThroughProxy() {
+  if (!canUseLocalProviderApi()) {
+    return Object.fromEntries(buildProviderProfiles().map((profile) => [profile.id, testProviderConnection(profile)]));
+  }
+
+  try {
+    const response = await fetch("/api/provider/test", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ settings: state.settings })
+    });
+    const data = await response.json();
+    return data.results || Object.fromEntries(buildProviderProfiles().map((profile) => [profile.id, testProviderConnection(profile)]));
+  } catch {
+    return Object.fromEntries(buildProviderProfiles().map((profile) => [profile.id, testProviderConnection(profile)]));
+  }
+}
+
+function canUseLocalProviderApi() {
+  return window.location.protocol === "http:" || window.location.protocol === "https:";
+}
+
 function isValidEndpoint(value = "") {
   if (!value) return false;
   try {
@@ -1038,11 +1081,11 @@ function bindEvents() {
   }
 
   document.querySelectorAll("[data-test-provider]").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
       collectSettingsInputs();
       const profile = buildProviderProfiles().find((item) => item.id === button.dataset.testProvider);
       if (!profile) return;
-      const result = testProviderConnection(profile);
+      const result = await testProviderThroughProxy(profile);
       providerStatus = { ...providerStatus, [profile.id]: result };
       addHistory("接口测试", `${profile.label}：${result.message}`, result.status);
       persistAppState();
@@ -1052,9 +1095,9 @@ function bindEvents() {
 
   const testAllProviders = document.querySelector("#testAllProviders");
   if (testAllProviders) {
-    testAllProviders.addEventListener("click", () => {
+    testAllProviders.addEventListener("click", async () => {
       collectSettingsInputs();
-      const results = Object.fromEntries(buildProviderProfiles().map((profile) => [profile.id, testProviderConnection(profile)]));
+      const results = await testAllProvidersThroughProxy();
       providerStatus = { ...providerStatus, ...results };
       const failedCount = Object.values(results).filter((result) => result.status === "failed").length;
       addHistory("接口测试", failedCount > 0 ? `${failedCount} 个能力配置未通过` : "全部能力配置校验通过", failedCount > 0 ? "failed" : "ready");

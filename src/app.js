@@ -247,21 +247,21 @@ function buildProviderProfiles(settings = state.settings) {
 function testProviderConnection(profile, settings = state.settings) {
   const checkedAt = new Date().toISOString();
   if (profile.mode === "mock") {
-    return { capabilityId: profile.id, status: "ready", checkedAt, message: "Mock 模式已启用，可使用本地模拟能力。" };
+    return { capabilityId: profile.id, mode: profile.mode, status: "ready", checkedAt, message: "Mock 模式已启用，可使用本地模拟能力。" };
   }
   if (!profile.provider || profile.provider === "未配置") {
-    return { capabilityId: profile.id, status: "failed", checkedAt, message: "缺少服务商配置。" };
+    return { capabilityId: profile.id, mode: profile.mode, status: "failed", checkedAt, message: "缺少服务商配置。" };
   }
   if (profile.requiresApiKey && !profile.apiKey) {
-    return { capabilityId: profile.id, status: "failed", checkedAt, message: "缺少 API Key。" };
+    return { capabilityId: profile.id, mode: profile.mode, status: "failed", checkedAt, message: "缺少 API Key。" };
   }
   if (profile.requiresEndpoint && !isValidEndpoint(profile.endpoint)) {
-    return { capabilityId: profile.id, status: "failed", checkedAt, message: "缺少有效的服务地址。" };
+    return { capabilityId: profile.id, mode: profile.mode, status: "failed", checkedAt, message: "缺少有效的服务地址。" };
   }
   if (profile.id === "publish" && !hasPublishTarget(settings)) {
-    return { capabilityId: profile.id, status: "failed", checkedAt, message: "缺少发布账号或发布 Webhook。" };
+    return { capabilityId: profile.id, mode: profile.mode, status: "failed", checkedAt, message: "缺少发布账号或发布 Webhook。" };
   }
-  return { capabilityId: profile.id, status: "ready", checkedAt, message: "配置校验通过，等待后端代理执行真实请求。" };
+  return { capabilityId: profile.id, mode: profile.mode, status: "ready", checkedAt, message: "配置校验通过，等待后端代理执行真实请求。" };
 }
 
 function isValidEndpoint(value = "") {
@@ -765,7 +765,13 @@ function renderSettings() {
 }
 
 function renderProviderStatus(profile) {
-  const status = providerStatus[profile.id] || (profile.mode === "mock" ? testProviderConnection(profile) : { status: "draft", message: "等待测试连接。" });
+  const cachedStatus = providerStatus[profile.id];
+  const status =
+    cachedStatus?.mode === profile.mode
+      ? cachedStatus
+      : profile.mode === "mock"
+        ? testProviderConnection(profile)
+        : { status: "draft", message: "等待测试连接。" };
   const meta = [profile.provider, profile.model].filter(Boolean).join(" · ");
   return `
     <article class="provider-status-card">

@@ -31,6 +31,7 @@ test("testProviderConnection lets mock mode run without credentials", () => {
   const result = testProviderConnection(profile);
 
   assert.equal(result.status, "ready");
+  assert.equal(result.mode, "mock");
   assert.match(result.message, /Mock/);
 });
 
@@ -43,6 +44,7 @@ test("testProviderConnection fails real mode when api key is missing", () => {
   const result = testProviderConnection(profile);
 
   assert.equal(result.status, "failed");
+  assert.equal(result.mode, "real");
   assert.match(result.message, /API Key/);
 });
 

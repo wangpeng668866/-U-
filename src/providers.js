@@ -79,6 +79,7 @@ export function testProviderConnection(profile, settings = {}) {
   if (mode === "mock") {
     return {
       capabilityId: profile.id,
+      mode,
       status: "ready",
       checkedAt,
       message: "Mock 模式已启用，可使用本地模拟能力。"
@@ -88,6 +89,7 @@ export function testProviderConnection(profile, settings = {}) {
   if (!profile.provider || profile.provider === "未配置") {
     return {
       capabilityId: profile.id,
+      mode,
       status: "failed",
       checkedAt,
       message: "缺少服务商配置。"
@@ -97,6 +99,7 @@ export function testProviderConnection(profile, settings = {}) {
   if (profile.requiresApiKey && !profile.apiKey) {
     return {
       capabilityId: profile.id,
+      mode,
       status: "failed",
       checkedAt,
       message: "缺少 API Key。"
@@ -106,6 +109,7 @@ export function testProviderConnection(profile, settings = {}) {
   if (profile.requiresEndpoint && !isValidEndpoint(profile.endpoint)) {
     return {
       capabilityId: profile.id,
+      mode,
       status: "failed",
       checkedAt,
       message: "缺少有效的服务地址。"
@@ -115,6 +119,7 @@ export function testProviderConnection(profile, settings = {}) {
   if (profile.id === "publish" && !hasPublishTarget(settings)) {
     return {
       capabilityId: profile.id,
+      mode,
       status: "failed",
       checkedAt,
       message: "缺少发布账号或发布 Webhook。"
@@ -123,6 +128,7 @@ export function testProviderConnection(profile, settings = {}) {
 
   return {
     capabilityId: profile.id,
+    mode,
     status: "ready",
     checkedAt,
     message: "配置校验通过，等待后端代理执行真实请求。",

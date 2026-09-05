@@ -1,7 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { assets } from "../src/mockData.js";
-import { createProject, filterAssets, generateScriptPreview, getProjectProgress, getStatusLabel } from "../src/domain.js";
+import {
+  createMockEditTask,
+  createMockPublishPackage,
+  createMockScript,
+  createProject,
+  filterAssets,
+  generateMockTopics,
+  generateScriptPreview,
+  getProjectProgress,
+  getStatusLabel
+} from "../src/domain.js";
 
 test("filterAssets filters by category, type, and query", () => {
   const result = filterAssets(assets, {
@@ -44,4 +54,40 @@ test("generateScriptPreview returns the core script sections", () => {
   assert.ok(script.hook.includes("探店视频"));
   assert.ok(script.body.includes("第一步"));
   assert.ok(script.ending.includes("批量做出来"));
+});
+
+test("generateMockTopics creates a scored topic set", () => {
+  const topics = generateMockTopics("餐饮");
+
+  assert.equal(topics.length, 3);
+  assert.ok(topics.every((topic) => topic.title.includes("餐饮")));
+  assert.ok(topics.every((topic) => topic.score >= 80));
+});
+
+test("createMockScript creates titles and storyboard shots", () => {
+  const [topic] = generateMockTopics("知识付费");
+  const script = createMockScript(topic);
+
+  assert.equal(script.topicTitle, topic.title);
+  assert.equal(script.titleOptions.length, 3);
+  assert.equal(script.storyboard.length, 3);
+});
+
+test("createMockEditTask creates a ready export task", () => {
+  const task = createMockEditTask({ id: "p1", name: "项目A" }, assets);
+
+  assert.equal(task.projectId, "p1");
+  assert.equal(task.status, "ready");
+  assert.match(task.outputPath, /项目A-mock\.mp4$/);
+});
+
+test("createMockPublishPackage creates a platform publish bundle", () => {
+  const [topic] = generateMockTopics("探店");
+  const script = createMockScript(topic);
+  const editTask = createMockEditTask({ id: "p1", name: "项目A" }, assets);
+  const publishPackage = createMockPublishPackage({ id: "p1", name: "项目A" }, script, editTask);
+
+  assert.equal(publishPackage.projectId, "p1");
+  assert.equal(publishPackage.videoPath, editTask.outputPath);
+  assert.ok(publishPackage.platforms.includes("抖音"));
 });

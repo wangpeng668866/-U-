@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test",
+    "test": "node --test test/*.mjs",
     "serve": "node scripts/serve.mjs",
-    "verify": "node --test"
+    "verify": "node --test test/*.mjs"
   }
 }

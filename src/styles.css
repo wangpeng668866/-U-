@@ -478,6 +478,14 @@ select {
   gap: 0.75rem;
 }
 
+.button-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
 .topic-row {
   display: flex;
   align-items: center;
@@ -501,6 +509,38 @@ select {
 .script-preview {
   line-height: 1.75;
   color: #ded8cc;
+}
+
+.storyboard-list {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.storyboard-list article,
+.result-box {
+  display: grid;
+  gap: 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: #111;
+  padding: 0.9rem;
+}
+
+.storyboard-list b {
+  color: #ffe3a5;
+}
+
+.storyboard-list small,
+.result-box small {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.result-box p {
+  margin: 0;
+  color: #ded8cc;
+  line-height: 1.7;
 }
 
 .page-heading {

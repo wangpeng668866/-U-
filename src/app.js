@@ -107,6 +107,10 @@ const storedState = loadStoredState();
 let projects = restoreList(storedState.projects, initialProjects);
 let assets = restoreList(storedState.assets, initialAssets);
 let historyItems = restoreList(storedState.historyItems, initialHistoryItems);
+let topics = restoreList(storedState.topics, topicIdeas);
+let scripts = restoreList(storedState.scripts, []);
+let editTasks = restoreList(storedState.editTasks, []);
+let publishTasks = restoreList(storedState.publishTasks, []);
 
 function filterAssets(assets, filters = {}) {
   const { category = "全部", type = "全部", query = "" } = filters;
@@ -150,6 +154,57 @@ function generateScriptPreview(topic) {
   };
 }
 
+function generateMockTopics(seed = "短视频") {
+  const keyword = seed.trim() || "短视频";
+  return [
+    { id: `topic-${Date.now()}-1`, title: `${keyword}账号如何用 30 秒讲清一个卖点`, score: 94, angle: "痛点开场 + 场景证明 + 行动引导" },
+    { id: `topic-${Date.now()}-2`, title: `${keyword}爆款视频的前三秒到底怎么设计`, score: 91, angle: "拆开头钩子、字幕节奏和反转点" },
+    { id: `topic-${Date.now()}-3`, title: `${keyword}批量出片怎样减少沟通和返工`, score: 87, angle: "把选题、素材、剪辑和发布做成固定流程" }
+  ];
+}
+
+function createMockScript(topic) {
+  const preview = generateScriptPreview(topic);
+  return {
+    id: `script-${Date.now()}`,
+    projectId: getCurrentProject()?.id,
+    topicTitle: topic.title,
+    titleOptions: [topic.title, `${topic.title}，这套方法更适合批量做`, `别再凭感觉拍了：${topic.title}`],
+    ...preview,
+    storyboard: [
+      { shot: "开场", visual: "特写痛点画面，字幕压重点词", narration: preview.hook },
+      { shot: "展开", visual: "素材库画面快切，配合三段式说明", narration: preview.body },
+      { shot: "收尾", visual: "成片预览和发布平台图标", narration: preview.ending }
+    ]
+  };
+}
+
+function createMockEditTask(project, sourceAssets = []) {
+  const selectedAssets = sourceAssets.slice(0, 3).map((asset) => asset.name);
+  return {
+    id: `edit-${Date.now()}`,
+    projectId: project.id,
+    status: "ready",
+    templateName: "三段式口播快剪",
+    aspectRatio: "9:16",
+    outputPath: `outputs/${project.name}-mock.mp4`,
+    summary: selectedAssets.length > 0 ? `已匹配 ${selectedAssets.join("、")}` : "使用默认画面素材生成模拟成片"
+  };
+}
+
+function createMockPublishPackage(project, script, editTask) {
+  return {
+    id: `publish-${Date.now()}`,
+    projectId: project.id,
+    title: script?.titleOptions?.[0] || `${project.name} 发布标题`,
+    caption: "把选题、文案、素材、剪辑和发布串成标准化流程，适合个人创作者和工作室批量出片。",
+    coverText: "30 秒讲清卖点",
+    videoPath: editTask?.outputPath || `outputs/${project.name}-mock.mp4`,
+    platforms: ["抖音", "小红书", "视频号", "B 站"],
+    status: "ready"
+  };
+}
+
 function createLocalProject(name, mode = "original") {
   const trimmedName = name.trim();
   if (!trimmedName) {
@@ -169,6 +224,22 @@ function createLocalProject(name, mode = "original") {
 
 function getCurrentProject() {
   return projects.find((project) => project.id === state.selectedProjectId) || projects[0];
+}
+
+function getSelectedTopic() {
+  return topics.find((topic) => topic.title === state.selectedTopicTitle) || topics[0] || topicIdeas[0];
+}
+
+function getProjectScript(project) {
+  return scripts.find((script) => script.projectId === project.id);
+}
+
+function getProjectEditTask(project) {
+  return editTasks.find((task) => task.projectId === project.id);
+}
+
+function getProjectPublishTask(project) {
+  return publishTasks.find((task) => task.projectId === project.id);
 }
 
 function addHistory(type, output, status = "ready") {
@@ -230,7 +301,7 @@ const state = {
   isCreatingProject: false,
   newProjectName: "",
   settings: { ...defaultSettings, ...(storedState.settings || {}) },
-  selectedTopic: topicIdeas[0]
+  selectedTopicTitle: storedState.ui?.selectedTopicTitle || topics[0]?.title || topicIdeas[0].title
 };
 
 const app = document.querySelector("#app");
@@ -240,12 +311,17 @@ function persistAppState() {
     projects,
     assets,
     historyItems,
+    topics,
+    scripts,
+    editTasks,
+    publishTasks,
     settings: state.settings,
     ui: {
       page: state.page,
       selectedProjectId: state.selectedProjectId,
       assetCategory: state.assetCategory,
-      assetType: state.assetType
+      assetType: state.assetType,
+      selectedTopicTitle: state.selectedTopicTitle
     }
   });
 }
@@ -343,7 +419,11 @@ function renderPage(project) {
 }
 
 function renderWorkspace(project) {
-  const script = generateScriptPreview(state.selectedTopic);
+  const selectedTopic = getSelectedTopic();
+  const fallbackScript = generateScriptPreview(selectedTopic);
+  const script = getProjectScript(project) || fallbackScript;
+  const editTask = getProjectEditTask(project);
+  const publishTask = getProjectPublishTask(project);
   return `
     <div class="workspace-grid">
       <section class="hero-panel">
@@ -387,13 +467,13 @@ function renderWorkspace(project) {
             <p class="eyebrow">选题池</p>
             <h2>今日可拍方向</h2>
           </div>
-          <button class="secondary-button" id="refreshTopics" type="button">换一批</button>
+          <button class="secondary-button" id="refreshTopics" type="button">生成选题</button>
         </div>
         <div class="topic-list">
-          ${topicIdeas
+          ${topics
             .map(
               (topic) => `
-                <button class="topic-row ${topic.title === state.selectedTopic.title ? "selected" : ""}" data-topic="${topic.title}" type="button">
+                <button class="topic-row ${topic.title === selectedTopic.title ? "selected" : ""}" data-topic="${topic.title}" type="button">
                   <span>
                     <strong>${topic.title}</strong>
                     <small>${topic.angle}</small>
@@ -412,12 +492,51 @@ function renderWorkspace(project) {
             <p class="eyebrow">文案预览</p>
             <h2>${script.title}</h2>
           </div>
-          <button class="primary-button" id="generateStoryboard" type="button">生成分镜</button>
+          <div class="button-row">
+            <button class="secondary-button" id="generateScript" type="button">生成文案</button>
+            <button class="primary-button" id="generateStoryboard" type="button">生成分镜</button>
+          </div>
         </div>
         <div class="script-preview">
+          ${script.titleOptions ? `<p><strong>标题：</strong>${script.titleOptions.join(" / ")}</p>` : ""}
           <p><strong>开头：</strong>${script.hook}</p>
           <p><strong>正文：</strong>${script.body}</p>
           <p><strong>结尾：</strong>${script.ending}</p>
+          ${
+            script.storyboard
+              ? `<div class="storyboard-list">${script.storyboard
+                  .map((shot) => `<article><b>${shot.shot}</b><span>${shot.visual}</span><small>${shot.narration}</small></article>`)
+                  .join("")}</div>`
+              : ""
+          }
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">智能剪辑</p>
+            <h2>${editTask ? editTask.templateName : "等待生成模拟成片"}</h2>
+          </div>
+          <button class="primary-button" id="runEditMock" type="button">生成剪辑</button>
+        </div>
+        <div class="result-box">
+          <p>${editTask ? editTask.summary : "点击后会模拟字幕、卡点、转场、配图和导出路径。"}</p>
+          <small>${editTask ? `${editTask.aspectRatio} · ${editTask.outputPath}` : "输出示例：outputs/项目名-mock.mp4"}</small>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">封面与发布</p>
+            <h2>${publishTask ? publishTask.title : "等待生成发布包"}</h2>
+          </div>
+          <button class="primary-button" id="generatePublishPackage" type="button">生成发布包</button>
+        </div>
+        <div class="result-box">
+          <p>${publishTask ? publishTask.caption : "点击后会生成封面文案、平台标题、发布正文和目标平台清单。"}</p>
+          <small>${publishTask ? `${publishTask.coverText} · ${publishTask.platforms.join(" / ")}` : "覆盖：抖音 / 小红书 / 视频号 / B 站"}</small>
         </div>
       </section>
     </div>
@@ -624,7 +743,9 @@ function bindEvents() {
       if (button.dataset.action === "startEdit") {
         project.currentStep = "剪辑";
         project.status = "processing";
-        addHistory("智能剪辑", "已进入智能剪辑流程", "processing");
+        const task = createMockEditTask(project, assets);
+        editTasks = [task, ...editTasks.filter((item) => item.projectId !== project.id)];
+        addHistory("智能剪辑", "已生成模拟剪辑任务", "ready");
       } else {
         project.currentStep = "文案";
         project.status = "processing";
@@ -636,6 +757,18 @@ function bindEvents() {
       render();
     });
   });
+
+  const refreshTopics = document.querySelector("#refreshTopics");
+  if (refreshTopics) {
+    refreshTopics.addEventListener("click", () => {
+      const project = getCurrentProject();
+      topics = generateMockTopics(project?.name || "短视频");
+      state.selectedTopicTitle = topics[0].title;
+      addHistory("选题生成", `已生成 ${topics.length} 条模拟选题`);
+      persistAppState();
+      render();
+    });
+  }
 
   const assetSearch = document.querySelector("#assetSearch");
   if (assetSearch) {
@@ -650,24 +783,84 @@ function bindEvents() {
 
   document.querySelectorAll("[data-topic]").forEach((button) => {
     button.addEventListener("click", () => {
-      const topic = topicIdeas.find((item) => item.title === button.dataset.topic);
-      if (topic) state.selectedTopic = topic;
+      const topic = topics.find((item) => item.title === button.dataset.topic);
+      if (topic) state.selectedTopicTitle = topic.title;
       addHistory("选题选择", `已选择：${button.dataset.topic}`);
       persistAppState();
       render();
     });
   });
 
+  const generateScript = document.querySelector("#generateScript");
+  if (generateScript) {
+    generateScript.addEventListener("click", () => {
+      const project = getCurrentProject();
+      if (!project) return;
+      const script = createMockScript(getSelectedTopic());
+      script.projectId = project.id;
+      scripts = [script, ...scripts.filter((item) => item.projectId !== project.id)];
+      project.currentStep = "文案";
+      project.status = "processing";
+      project.updatedAt = "刚刚";
+      addHistory("文案生成", "已生成标题、口播稿和结构草案");
+      persistAppState();
+      render();
+    });
+  }
+
   const generateStoryboard = document.querySelector("#generateStoryboard");
   if (generateStoryboard) {
     generateStoryboard.addEventListener("click", () => {
       const project = getCurrentProject();
+      if (!project) return;
+      let script = getProjectScript(project);
+      if (!script) {
+        script = createMockScript(getSelectedTopic());
+        script.projectId = project.id;
+        scripts = [script, ...scripts];
+      }
       if (project) {
         project.currentStep = "口播/素材";
         project.status = "processing";
         project.updatedAt = "刚刚";
       }
       addHistory("分镜生成", "已生成 3 段口播分镜草稿");
+      persistAppState();
+      render();
+    });
+  }
+
+  const runEditMock = document.querySelector("#runEditMock");
+  if (runEditMock) {
+    runEditMock.addEventListener("click", () => {
+      const project = getCurrentProject();
+      if (!project) return;
+      const task = createMockEditTask(project, assets);
+      editTasks = [task, ...editTasks.filter((item) => item.projectId !== project.id)];
+      project.currentStep = "剪辑";
+      project.status = "ready";
+      project.updatedAt = "刚刚";
+      addHistory("智能剪辑", "已生成字幕、卡点和模拟成片路径");
+      persistAppState();
+      render();
+    });
+  }
+
+  const generatePublishPackage = document.querySelector("#generatePublishPackage");
+  if (generatePublishPackage) {
+    generatePublishPackage.addEventListener("click", () => {
+      const project = getCurrentProject();
+      if (!project) return;
+      const script = getProjectScript(project) || createMockScript(getSelectedTopic());
+      const editTask = getProjectEditTask(project) || createMockEditTask(project, assets);
+      scripts = [script, ...scripts.filter((item) => item.projectId !== project.id)];
+      editTasks = [editTask, ...editTasks.filter((item) => item.projectId !== project.id)];
+      const publishTask = createMockPublishPackage(project, script, editTask);
+      publishTasks = [publishTask, ...publishTasks.filter((item) => item.projectId !== project.id)];
+      project.currentStep = "发布";
+      project.status = "ready";
+      project.updatedAt = "刚刚";
+      addHistory("发布包生成", "已生成封面文案、发布标题和平台清单");
       persistAppState();
       render();
     });

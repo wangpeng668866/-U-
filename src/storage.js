@@ -30,11 +30,15 @@ export function restoreList(value, fallback) {
   return Array.isArray(value) && value.length > 0 ? value : clone(fallback);
 }
 
-export function buildSnapshot({ projects, assets, historyItems, settings, ui }) {
+export function buildSnapshot({ projects, assets, historyItems, topics, scripts, editTasks, publishTasks, settings, ui }) {
   return {
     projects: restoreList(projects, []),
     assets: restoreList(assets, []),
     historyItems: restoreList(historyItems, []),
+    topics: restoreList(topics, []),
+    scripts: restoreList(scripts, []),
+    editTasks: restoreList(editTasks, []),
+    publishTasks: restoreList(publishTasks, []),
     settings: { ...(settings || {}) },
     ui: { ...(ui || {}) },
     savedAt: new Date().toISOString()

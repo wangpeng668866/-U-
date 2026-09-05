@@ -1,7 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { assets } from "../src/mockData.js";
-import { runEditStep, runPublishStep, runScriptStep, runTopicStep, testWorkflowConnections } from "../src/workflow.js";
+import {
+  runEditStep,
+  runProviderBackedStep,
+  runPublishStep,
+  runScriptStep,
+  runTopicStep,
+  testWorkflowConnections
+} from "../src/workflow.js";
 
 test("runTopicStep creates three scored topic ideas from a seed", () => {
   const topics = runTopicStep("探店");
@@ -50,4 +57,12 @@ test("testWorkflowConnections checks each provider capability", () => {
   assert.equal(results.avatar.status, "ready");
   assert.equal(results.edit.status, "ready");
   assert.equal(results.publish.status, "ready");
+});
+
+test("runProviderBackedStep invokes the selected provider capability", async () => {
+  const result = await runProviderBackedStep("ai", "generate-topic", { seed: "餐饮" }, { providerMode: "mock" });
+
+  assert.equal(result.status, "mocked");
+  assert.equal(result.capabilityId, "ai");
+  assert.equal(result.data.seed, "餐饮");
 });

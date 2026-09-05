@@ -2,7 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildProviderProfiles,
+  buildProviderRequest,
   collectProviderStatuses,
+  invokeProvider,
   maskSecret,
   runWithRetry,
   testProviderConnection
@@ -86,6 +88,59 @@ test("collectProviderStatuses marks configured real providers as ready", () => {
 test("maskSecret keeps only secret edges visible", () => {
   assert.equal(maskSecret("sk-1234567890"), "sk-1****7890");
   assert.equal(maskSecret("short"), "****");
+});
+
+test("buildProviderRequest creates a proxy-friendly post request", () => {
+  const [profile] = buildProviderProfiles({
+    providerMode: "real",
+    aiProvider: "DeepSeek",
+    aiModel: "deepseek-v4-flash",
+    aiApiKey: "sk-1234567890",
+    aiEndpoint: "https://api.example.com/workflow"
+  });
+  const request = buildProviderRequest(profile, "generate-script", { topic: "探店" });
+  const body = JSON.parse(request.options.body);
+
+  assert.equal(request.url, "https://api.example.com/workflow");
+  assert.equal(request.options.method, "POST");
+  assert.equal(request.options.headers.authorization, "Bearer sk-1234567890");
+  assert.equal(body.capability, "ai");
+  assert.equal(body.action, "generate-script");
+  assert.equal(body.payload.topic, "探店");
+});
+
+test("invokeProvider returns mocked payload in mock mode", async () => {
+  const [profile] = buildProviderProfiles({ providerMode: "mock" });
+  const result = await invokeProvider(profile, "generate-topic", { seed: "餐饮" });
+
+  assert.equal(result.status, "mocked");
+  assert.equal(result.data.seed, "餐饮");
+});
+
+test("invokeProvider calls configured real provider through injected fetcher", async () => {
+  const [profile] = buildProviderProfiles({
+    providerMode: "real",
+    aiProvider: "DeepSeek",
+    aiModel: "deepseek-v4-flash",
+    aiApiKey: "sk-1234567890",
+    aiEndpoint: "https://api.example.com/workflow"
+  });
+  const calls = [];
+  const result = await invokeProvider(profile, "generate-script", { topic: "探店" }, {
+    fetcher: async (url, options) => {
+      calls.push({ url, options });
+      return {
+        ok: true,
+        status: 200,
+        headers: new Map([["content-type", "application/json"]]),
+        json: async () => ({ script: "ok" })
+      };
+    }
+  });
+
+  assert.equal(result.status, "ready");
+  assert.equal(result.data.script, "ok");
+  assert.equal(calls[0].url, "https://api.example.com/workflow");
 });
 
 test("runWithRetry retries failed provider operations", async () => {

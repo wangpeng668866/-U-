@@ -136,6 +136,73 @@ export function collectProviderStatuses(settings = {}) {
   );
 }
 
+export function buildProviderRequest(profile, action, payload = {}) {
+  return {
+    url: profile.endpoint,
+    options: {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...(profile.apiKey ? { authorization: `Bearer ${profile.apiKey}` } : {})
+      },
+      body: JSON.stringify({
+        capability: profile.id,
+        action,
+        provider: profile.provider,
+        model: profile.model,
+        payload
+      })
+    }
+  };
+}
+
+export async function invokeProvider(profile, action, payload = {}, options = {}) {
+  const connection = testProviderConnection(profile, options.settings || {});
+
+  if (connection.status === "failed") {
+    const error = new Error(connection.message);
+    error.connection = connection;
+    throw error;
+  }
+
+  if ((profile.mode || "mock") === "mock") {
+    return {
+      status: "mocked",
+      capabilityId: profile.id,
+      action,
+      data: payload
+    };
+  }
+
+  const request = buildProviderRequest(profile, action, payload);
+  const fetcher = options.fetcher || globalThis.fetch;
+  if (typeof fetcher !== "function") {
+    throw new Error("当前运行环境缺少 fetch，无法调用真实服务。");
+  }
+
+  return runWithRetry(
+    async () => {
+      const response = await fetcher(request.url, request.options);
+      const data = await readResponseBody(response);
+
+      if (!response.ok) {
+        const error = new Error(data?.message || `真实服务请求失败：${response.status}`);
+        error.status = response.status;
+        error.data = data;
+        throw error;
+      }
+
+      return {
+        status: "ready",
+        capabilityId: profile.id,
+        action,
+        data
+      };
+    },
+    { retries: Number(options.retries ?? 2), delayMs: Number(options.delayMs ?? 0) }
+  );
+}
+
 export async function runWithRetry(operation, options = {}) {
   const retries = Number.isFinite(options.retries) ? options.retries : 2;
   const delayMs = Number.isFinite(options.delayMs) ? options.delayMs : 0;
@@ -176,4 +243,12 @@ function wait(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+}
+
+async function readResponseBody(response) {
+  const contentType = response.headers?.get?.("content-type") || "";
+  if (contentType.includes("application/json")) {
+    return response.json();
+  }
+  return response.text();
 }

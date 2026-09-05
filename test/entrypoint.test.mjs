@@ -40,3 +40,10 @@ test("browser entrypoint includes provider connection controls", async () => {
   assert.match(app, /id="testAllProviders"/);
   assert.match(app, /data-test-provider/);
 });
+
+test("local server exposes provider api routes", async () => {
+  const server = await readFile(new URL("../scripts/serve.mjs", import.meta.url), "utf8");
+
+  assert.match(server, /handleProviderApiRequest/);
+  assert.match(server, /\/api\/provider\//);
+});

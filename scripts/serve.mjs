@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
+import { handleProviderApiRequest } from "../src/providerApi.js";
 
 const root = join(fileURLToPath(new URL("..", import.meta.url)));
 const port = Number(process.env.PORT || 4173);
@@ -13,7 +14,12 @@ const mimeTypes = {
   ".json": "application/json; charset=utf-8"
 };
 
-const server = createServer((request, response) => {
+const server = createServer(async (request, response) => {
+  if ((request.url || "").startsWith("/api/provider/")) {
+    await handleProviderApiRequest(request, response);
+    return;
+  }
+
   const url = new URL(request.url || "/", `http://${request.headers.host}`);
   const requestedPath = decodeURIComponent(url.pathname === "/" ? "/index.html" : url.pathname);
   const filePath = normalize(join(root, requestedPath));

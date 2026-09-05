@@ -32,3 +32,11 @@ test("browser entrypoint uses an inline project form instead of prompt dialogs",
   assert.match(app, /id="newProjectName"/);
   assert.match(app, /id="confirmNewProject"/);
 });
+
+test("browser entrypoint includes provider connection controls", async () => {
+  const app = await readFile(new URL("../src/app.js", import.meta.url), "utf8");
+
+  assert.match(app, /function testProviderConnection/);
+  assert.match(app, /id="testAllProviders"/);
+  assert.match(app, /data-test-provider/);
+});

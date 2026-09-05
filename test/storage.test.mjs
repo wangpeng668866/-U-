@@ -34,6 +34,7 @@ test("buildSnapshot keeps the core local data buckets", () => {
     scripts: [{ id: "s1" }],
     editTasks: [{ id: "e1" }],
     publishTasks: [{ id: "pub1" }],
+    providerStatus: { ai: { status: "ready" } },
     settings: { aiProvider: "DeepSeek" },
     ui: { selectedProjectId: "p1" }
   });
@@ -45,6 +46,7 @@ test("buildSnapshot keeps the core local data buckets", () => {
   assert.equal(snapshot.scripts[0].id, "s1");
   assert.equal(snapshot.editTasks[0].id, "e1");
   assert.equal(snapshot.publishTasks[0].id, "pub1");
+  assert.equal(snapshot.providerStatus.ai.status, "ready");
   assert.equal(snapshot.settings.aiProvider, "DeepSeek");
   assert.equal(snapshot.ui.selectedProjectId, "p1");
   assert.match(snapshot.savedAt, /^\d{4}-\d{2}-\d{2}T/);

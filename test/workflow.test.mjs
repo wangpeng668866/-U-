@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { assets } from "../src/mockData.js";
-import { runEditStep, runPublishStep, runScriptStep, runTopicStep } from "../src/workflow.js";
+import { runEditStep, runPublishStep, runScriptStep, runTopicStep, testWorkflowConnections } from "../src/workflow.js";
 
 test("runTopicStep creates three scored topic ideas from a seed", () => {
   const topics = runTopicStep("探店");
@@ -40,4 +40,14 @@ test("runPublishStep creates a publish package for common platforms", () => {
   assert.equal(publishPackage.status, "ready");
   assert.ok(publishPackage.platforms.includes("抖音"));
   assert.equal(publishPackage.videoPath, editTask.outputPath);
+});
+
+test("testWorkflowConnections checks each provider capability", () => {
+  const results = testWorkflowConnections({ providerMode: "mock" });
+
+  assert.equal(results.ai.status, "ready");
+  assert.equal(results.image.status, "ready");
+  assert.equal(results.avatar.status, "ready");
+  assert.equal(results.edit.status, "ready");
+  assert.equal(results.publish.status, "ready");
 });

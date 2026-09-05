@@ -41,15 +41,27 @@ const topicIdeas = [
 ];
 
 const defaultSettings = {
+  providerMode: "mock",
   aiProvider: "DeepSeek",
   aiModel: "deepseek-v4-flash",
   aiApiKey: "",
+  aiEndpoint: "",
   imageProvider: "智谱 CogView",
   visionModel: "GLM",
+  imageApiKey: "",
+  imageEndpoint: "",
   coverStyle: "短视频爆款封面",
   voiceProvider: "MiniMax",
   avatarProvider: "阿里云百炼",
   photoDriver: "灵动人像",
+  voiceApiKey: "",
+  avatarApiKey: "",
+  digitalHumanEndpoint: "",
+  editProvider: "本地 Remotion",
+  editApiKey: "",
+  editEndpoint: "",
+  publishProvider: "浏览器自动化",
+  publishWebhook: "",
   douyinAccount: "未绑定",
   xiaohongshuAccount: "未绑定",
   bilibiliAccount: "未绑定",
@@ -111,6 +123,15 @@ let topics = restoreList(storedState.topics, topicIdeas);
 let scripts = restoreList(storedState.scripts, []);
 let editTasks = restoreList(storedState.editTasks, []);
 let publishTasks = restoreList(storedState.publishTasks, []);
+let providerStatus = { ...(storedState.providerStatus || {}) };
+
+const providerCapabilities = [
+  ["ai", "文案模型", "aiProvider", "aiModel", "aiApiKey", "aiEndpoint", true, true],
+  ["image", "封面出图", "imageProvider", "visionModel", "imageApiKey", "imageEndpoint", true, true],
+  ["avatar", "数字人口播", "avatarProvider", "photoDriver", "avatarApiKey", "digitalHumanEndpoint", true, true],
+  ["edit", "智能剪辑", "editProvider", "defaultMode", "editApiKey", "editEndpoint", false, false],
+  ["publish", "平台发布", "publishProvider", "uiMode", "publishWebhook", "publishWebhook", false, false]
+];
 
 function filterAssets(assets, filters = {}) {
   const { category = "全部", type = "全部", query = "" } = filters;
@@ -203,6 +224,60 @@ function createMockPublishPackage(project, script, editTask) {
     platforms: ["抖音", "小红书", "视频号", "B 站"],
     status: "ready"
   };
+}
+
+function getProviderMode(settings = state.settings) {
+  return settings.providerMode === "real" ? "real" : "mock";
+}
+
+function buildProviderProfiles(settings = state.settings) {
+  return providerCapabilities.map(([id, label, providerKey, modelKey, apiKeyKey, endpointKey, requiresApiKey, requiresEndpoint]) => ({
+    id,
+    label,
+    provider: settings[providerKey] || "未配置",
+    model: settings[modelKey] || "",
+    apiKey: settings[apiKeyKey] || "",
+    endpoint: settings[endpointKey] || "",
+    requiresApiKey,
+    requiresEndpoint,
+    mode: getProviderMode(settings)
+  }));
+}
+
+function testProviderConnection(profile, settings = state.settings) {
+  const checkedAt = new Date().toISOString();
+  if (profile.mode === "mock") {
+    return { capabilityId: profile.id, status: "ready", checkedAt, message: "Mock 模式已启用，可使用本地模拟能力。" };
+  }
+  if (!profile.provider || profile.provider === "未配置") {
+    return { capabilityId: profile.id, status: "failed", checkedAt, message: "缺少服务商配置。" };
+  }
+  if (profile.requiresApiKey && !profile.apiKey) {
+    return { capabilityId: profile.id, status: "failed", checkedAt, message: "缺少 API Key。" };
+  }
+  if (profile.requiresEndpoint && !isValidEndpoint(profile.endpoint)) {
+    return { capabilityId: profile.id, status: "failed", checkedAt, message: "缺少有效的服务地址。" };
+  }
+  if (profile.id === "publish" && !hasPublishTarget(settings)) {
+    return { capabilityId: profile.id, status: "failed", checkedAt, message: "缺少发布账号或发布 Webhook。" };
+  }
+  return { capabilityId: profile.id, status: "ready", checkedAt, message: "配置校验通过，等待后端代理执行真实请求。" };
+}
+
+function isValidEndpoint(value = "") {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+function hasPublishTarget(settings = state.settings) {
+  return Boolean(settings.publishWebhook) || [settings.douyinAccount, settings.xiaohongshuAccount, settings.bilibiliAccount].some(
+    (account) => account && account !== "未绑定"
+  );
 }
 
 function createLocalProject(name, mode = "original") {
@@ -315,6 +390,7 @@ function persistAppState() {
     scripts,
     editTasks,
     publishTasks,
+    providerStatus,
     settings: state.settings,
     ui: {
       page: state.page,
@@ -620,28 +696,56 @@ function renderHistory() {
 }
 
 function renderSettings() {
+  const profiles = buildProviderProfiles();
   return `
     <section class="page-heading">
       <h1>设置</h1>
       <p>配置 AI 接口、封面出图、数字人口播、发布账号和本地数据目录。</p>
     </section>
     <section class="settings-grid">
+      <section class="panel wide">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">真实能力接入</p>
+            <h2>${getProviderMode() === "real" ? "真实服务模式" : "Mock 演示模式"}</h2>
+          </div>
+          <button class="primary-button" id="testAllProviders" type="button">测试全部连接</button>
+        </div>
+        <div class="provider-status-grid">
+          ${profiles.map((profile) => renderProviderStatus(profile)).join("")}
+        </div>
+      </section>
       ${renderSettingsCard("AI 接口", [
+        ["能力模式", state.settings.providerMode, "providerMode"],
         ["服务商", state.settings.aiProvider, "aiProvider"],
         ["模型", state.settings.aiModel, "aiModel"],
-        ["API Key", state.settings.aiApiKey, "aiApiKey", "password"]
+        ["API Key", state.settings.aiApiKey, "aiApiKey", "password"],
+        ["服务地址", state.settings.aiEndpoint, "aiEndpoint"]
       ])}
       ${renderSettingsCard("封面等图片生成", [
         ["出图服务", state.settings.imageProvider, "imageProvider"],
         ["看图模型", state.settings.visionModel, "visionModel"],
+        ["API Key", state.settings.imageApiKey, "imageApiKey", "password"],
+        ["服务地址", state.settings.imageEndpoint, "imageEndpoint"],
         ["风格", state.settings.coverStyle, "coverStyle"]
       ])}
       ${renderSettingsCard("数字人", [
         ["声音克隆", state.settings.voiceProvider, "voiceProvider"],
         ["对口型", state.settings.avatarProvider, "avatarProvider"],
-        ["照片驱动", state.settings.photoDriver, "photoDriver"]
+        ["照片驱动", state.settings.photoDriver, "photoDriver"],
+        ["声音 Key", state.settings.voiceApiKey, "voiceApiKey", "password"],
+        ["数字人 Key", state.settings.avatarApiKey, "avatarApiKey", "password"],
+        ["服务地址", state.settings.digitalHumanEndpoint, "digitalHumanEndpoint"]
+      ])}
+      ${renderSettingsCard("智能剪辑", [
+        ["剪辑服务", state.settings.editProvider, "editProvider"],
+        ["接口 Key", state.settings.editApiKey, "editApiKey", "password"],
+        ["服务地址", state.settings.editEndpoint, "editEndpoint"],
+        ["失败重试次数", state.settings.maxRetries, "maxRetries"]
       ])}
       ${renderSettingsCard("发布账号绑定", [
+        ["发布服务", state.settings.publishProvider, "publishProvider"],
+        ["发布 Webhook", state.settings.publishWebhook, "publishWebhook"],
         ["抖音", state.settings.douyinAccount, "douyinAccount"],
         ["小红书", state.settings.xiaohongshuAccount, "xiaohongshuAccount"],
         ["B 站", state.settings.bilibiliAccount, "bilibiliAccount"]
@@ -660,12 +764,27 @@ function renderSettings() {
   `;
 }
 
+function renderProviderStatus(profile) {
+  const status = providerStatus[profile.id] || (profile.mode === "mock" ? testProviderConnection(profile) : { status: "draft", message: "等待测试连接。" });
+  const meta = [profile.provider, profile.model].filter(Boolean).join(" · ");
+  return `
+    <article class="provider-status-card">
+      <div>
+        <strong>${profile.label}</strong>
+        <small>${meta}</small>
+      </div>
+      <span class="status-badge ${status.status}">${getStatusLabel(status.status)}</span>
+      <p>${status.message}</p>
+      <button class="secondary-button" type="button" data-test-provider="${profile.id}">测试${profile.label}</button>
+    </article>
+  `;
+}
+
 function renderSettingsCard(title, rows) {
   return `
     <section class="panel">
       <div class="panel-header">
         <h2>${title}</h2>
-        <button class="secondary-button" type="button">测试连接</button>
       </div>
       <div class="settings-list">
         ${rows
@@ -905,14 +1024,44 @@ function bindEvents() {
   const saveSettings = document.querySelector("#saveSettings");
   if (saveSettings) {
     saveSettings.addEventListener("click", () => {
-      document.querySelectorAll("[data-setting-key]").forEach((input) => {
-        state.settings[input.dataset.settingKey] = input.value;
-      });
+      collectSettingsInputs();
       addHistory("设置保存", "AI 接口、发布账号和数据目录已保存到本地");
       persistAppState();
       render();
     });
   }
+
+  document.querySelectorAll("[data-test-provider]").forEach((button) => {
+    button.addEventListener("click", () => {
+      collectSettingsInputs();
+      const profile = buildProviderProfiles().find((item) => item.id === button.dataset.testProvider);
+      if (!profile) return;
+      const result = testProviderConnection(profile);
+      providerStatus = { ...providerStatus, [profile.id]: result };
+      addHistory("接口测试", `${profile.label}：${result.message}`, result.status);
+      persistAppState();
+      render();
+    });
+  });
+
+  const testAllProviders = document.querySelector("#testAllProviders");
+  if (testAllProviders) {
+    testAllProviders.addEventListener("click", () => {
+      collectSettingsInputs();
+      const results = Object.fromEntries(buildProviderProfiles().map((profile) => [profile.id, testProviderConnection(profile)]));
+      providerStatus = { ...providerStatus, ...results };
+      const failedCount = Object.values(results).filter((result) => result.status === "failed").length;
+      addHistory("接口测试", failedCount > 0 ? `${failedCount} 个能力配置未通过` : "全部能力配置校验通过", failedCount > 0 ? "failed" : "ready");
+      persistAppState();
+      render();
+    });
+  }
+}
+
+function collectSettingsInputs() {
+  document.querySelectorAll("[data-setting-key]").forEach((input) => {
+    state.settings[input.dataset.settingKey] = input.value;
+  });
 }
 
 window.openProjectCreator = openProjectCreator;
